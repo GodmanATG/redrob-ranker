@@ -35,8 +35,8 @@ Disqualifiers:
 
 # Text matching settings
 TFIDF_MAX_FEATURES = 10000
-TOP_K_SEMANTIC = 5000
-AI_RERANK_TOP_K = 2800
+TOP_K_SEMANTIC = 3000
+AI_RERANK_TOP_K = 800
 
 # Scoring Weights
 WEIGHT_AI = 0.40
