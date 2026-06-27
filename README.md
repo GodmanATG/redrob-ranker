@@ -6,23 +6,23 @@ This repository contains our submission for the **Redrob Intelligent Candidate D
 
 Our pipeline runs **entirely on CPU in ~2 minutes** with zero external API calls, comfortably within the 5-minute / 16 GB / CPU-only / no-network constraints.
 
-## Quick Start
+## Quick Start (Docker Reproduction)
 
+We have containerized the entire pipeline to guarantee offline execution and dependency security. The Docker image pre-downloads the HuggingFace model during the build phase, meaning **0 network calls** are made during execution.
+
+**1. Build the Image**
 ```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-
-# 2. Run the pipeline (single command — produces submission.csv)
-python rank.py --candidates ./candidates.jsonl --out ./submission.csv
-
-# 3. (Optional) Validate the output format
-python audit_and_extract.py
+docker build -t redrob-ranker .
 ```
 
-The pipeline also accepts gzipped input:
+**2. Run the Container**
+Mount the directory containing your `candidates.jsonl` file to the `/data` folder inside the container. 
+
+For example, if your `candidates.jsonl` file is located at `/Users/judge/Downloads/dataset/`:
 ```bash
-python rank.py --candidates ./candidates.jsonl.gz --out ./submission.csv
+docker run -v "/Users/judge/Downloads/dataset:/data" redrob-ranker
 ```
+*Note: This command will read `/data/candidates.jsonl` and output the final `/data/submission.csv` directly into your local dataset folder in under 3 minutes.*
 
 ## Architecture
 
@@ -54,7 +54,7 @@ candidates.jsonl (100,000 records)
 ### Stage 1 — Enhanced Fast-Filter (`stages/tfidf_search.py`)
 
 - **N-Gram TF-IDF** with `ngram_range=(1, 3)` captures multi-word technical phrases like "retrieval augmented generation" and "vector database" that single-word matching misses.
-- **Output**: The top 5,000 candidates by cosine similarity, passed downstream with their TF-IDF scores.
+- **Output**: The top 3,000 candidates by cosine similarity, passed downstream with their TF-IDF scores.
 
 ### Stage 2 — Universal Honeypot Guard (`stages/honeypot.py`)
 
@@ -67,7 +67,7 @@ Instead of hardcoding company blocklists, we use objective math to catch fakes:
 
 - **Dynamic Reading**: Instead of hardcoding JD logic, we pass the *full Job Description text* (including the "Disqualifiers" section) directly into the AI. It naturally penalizes "title-chasers" and "pure researchers" without any hardcoded logic.
 - **Model**: `cross-encoder/ms-marco-MiniLM-L-12-v2` feeds BOTH the JD and candidate profile into the same transformer, allowing direct cross-attention.
-- **Inference**: 2,800 candidates evaluated in batches of 32 on CPU (~4 minutes).
+- **Inference**: 800 candidates evaluated in batches of 32 on CPU (~2-3 minutes even on weak cloud instances).
 - **Universal Behavioral Scoring**: We parse `redrob_signals` to rigorously evaluate engagement: ghost candidates (inactive >6 months) are zeroed out, high GitHub activity is boosted, and interview completion rates dynamically shift the heuristic score.
 - **Blended scoring formula**:
 
@@ -131,28 +131,21 @@ redrob-ranker/
 
 | Metric | Measured | Limit |
 |--------|----------|-------|
-| Wall-clock time | ~4.5 minutes | 5 minutes |
+| Wall-clock time | ~3 minutes | 5 minutes |
 | Peak RAM | ~4 GB | 16 GB |
 | GPU | None | None allowed |
 | Network during ranking | None | None allowed |
 | Disk state | 0 bytes | 5 GB |
 
-## Docker Reproduction
 
-```bash
-docker build -t redrob-ranker .
-docker run -v /path/to/data:/data redrob-ranker
-```
-
-This produces `/data/submission.csv` from `/data/candidates.jsonl`.
 
 ## Design Decisions
 
-1. **Why TF-IDF before AI?** Running a Cross-Encoder on 100K candidates would take ~2.5 hours on CPU. TF-IDF narrows the pool to 5,000 in 30 seconds, making deep AI evaluation feasible within the time budget.
+1. **Why TF-IDF before AI?** Running a Cross-Encoder on 100K candidates would take hours on CPU. TF-IDF narrows the pool to 3,000 in 30 seconds, making deep AI evaluation feasible within the time budget.
 
 2. **Why N-grams?** Single-word TF-IDF treats "vector" and "database" as independent terms. With `ngram_range=(1,3)`, the phrase "vector database" becomes a single, high-value feature that strongly correlates with relevance.
 
-3. **Why 12-layer over 6-layer?** The 12-layer model (`L-12-v2`) has double the transformer depth of the 6-layer variant, giving it significantly better ability to understand complex resume language. It costs ~2x more compute but still finishes in ~4 minutes.
+3. **Why 12-layer over 6-layer?** The 12-layer model (`L-12-v2`) has double the transformer depth of the 6-layer variant, giving it significantly better ability to understand complex resume language. It costs ~2x more compute but easily finishes in time when evaluating 800 candidates.
 
 4. **Why not a local LLM for reasoning?** Even the smallest local LLMs (TinyLlama, Phi-2) take 2–5 seconds per candidate on CPU. For 100 candidates, that's 200–500 seconds — dangerously close to or exceeding the 5-minute limit. Our deterministic engine takes 0 ms total.
 
