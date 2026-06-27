@@ -1,0 +1,28 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Large data files
+*.jsonl
+*.jsonl.gz
+candidates*.jsonl
+sample_candidates*.jsonl
+*.json
+
+# Output files
+*.csv
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/

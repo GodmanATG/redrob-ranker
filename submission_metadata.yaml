@@ -1,0 +1,75 @@
+# Redrob Hackathon — Submission Metadata
+# ============================================================================
+# Team identity
+# ============================================================================
+team_name: "FILL_YOUR_TEAM_NAME"  # <-- FILL THIS
+
+primary_contact:
+  name: "FILL_YOUR_NAME"          # <-- FILL THIS
+  email: "FILL@example.com"       # <-- FILL THIS
+  phone: "+91-XXXXXXXXXX"         # <-- FILL THIS
+
+team_members:
+  - name: "FILL_YOUR_NAME"        # <-- FILL THIS
+    email: "FILL@example.com"     # <-- FILL THIS
+    role: "AI Engineer"
+
+# ============================================================================
+# Code and reproducibility
+# ============================================================================
+github_repo: "https://github.com/GodmanATG/redrob-ranker.git"
+sandbox_link: "FILL_COLAB_OR_HUGGINGFACE_LINK"                 # <-- FILL THIS
+
+reproduce_command: "python rank.py --candidates ./candidates.jsonl --out ./submission.csv"
+
+# ============================================================================
+# Compute environment
+# ============================================================================
+compute:
+  platform: "Windows 11 Desktop"
+  cpu_cores: 8
+  ram_gb: 16
+  python_version: "3.13"
+  os: "Windows 11"
+  uses_gpu_for_inference: false
+  has_network_during_ranking: false
+  pre_computation_required: false
+  pre_computation_time_minutes: 0
+
+# ============================================================================
+# AI tools declaration
+# ============================================================================
+ai_tools_used:
+  - "Gemini"
+  - "Claude"
+
+ai_usage_summary: |
+  Used Gemini and Claude as pair-programming assistants to architect the three-stage
+  cascade pipeline, debug Python compatibility issues (Windows cp1252 encoding),
+  and iterate on scoring weights. No candidate data was ever sent to any hosted LLM.
+  All ranking inference runs locally via a downloaded HuggingFace Cross-Encoder model.
+
+# ============================================================================
+# Approach summary
+# ============================================================================
+methodology_summary: |
+  Three-stage cascade ranker. Stage 1: N-gram TF-IDF (ngram_range 1-3) with JD
+  synonym injection to pull 5000 candidates from 100K. Stage 2: Boolean trap
+  filter removes honeypots (impossible skill durations, YOE mismatches). 
+  Stage 3: Local 12-layer Cross-Encoder (ms-marco-MiniLM-L-12-v2) scores the top 
+  2800 candidates against the full unstructured JD text (allowing natural penalty 
+  of JD disqualifiers). Then blends AI score (40%) with experience band (20%), TF-IDF
+  (15%), core skill depth (15%), and behavioral signals (10% - penalizes inactive users, 
+  rewards high GitHub scores/interview completion). Reasoning is generated via a 
+  deterministic fact-extraction engine using profile data. Total runtime ~4.5 minutes 
+  on CPU. No external API calls, no GPU.
+
+# ============================================================================
+# Declarations
+# ============================================================================
+declarations:
+  read_submission_spec: true
+  code_is_original_work: true
+  no_collusion: true
+  honeypot_check_done: true
+  reproduction_tested: true
