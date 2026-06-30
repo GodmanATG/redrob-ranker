@@ -1,10 +1,31 @@
+import logging
+import re
+from typing import List, Dict, Tuple
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from config import JD_TEXT, TFIDF_MAX_FEATURES, TOP_K_SEMANTIC
+from config import JD_TEXT, TFIDF_MAX_FEATURES, TOP_K_SEMANTIC, SYNONYMS
 
-def build_candidate_document(candidate):
+logger = logging.getLogger(__name__)
+
+def expand_synonyms(text: str) -> str:
     """
-    Constructs a rich text document for a candidate to be used in TF-IDF.
+    Finds acronyms/terms in text that exist in SYNONYMS and appends their expansions
+    to address vocabulary staticness in TF-IDF.
+    """
+    text_lower = text.lower()
+    expansions = []
+    for key, val in SYNONYMS.items():
+        if re.search(r'\b' + re.escape(key) + r'\b', text_lower):
+            if val not in expansions and val not in text_lower:
+                expansions.append(val)
+    if expansions:
+        return text + " " + " ".join(expansions)
+    return text
+
+def build_candidate_document(candidate: Dict) -> str:
+    """
+    Constructs a rich text document for a candidate to be used in TF-IDF,
+    expanded with common acronym/synonym mappings.
     """
     profile = candidate.get("profile", {})
     headline = profile.get("headline", "")
@@ -19,16 +40,18 @@ def build_candidate_document(candidate):
     skills = candidate.get("skills", [])
     skills_text = " ".join([s.get("name", "") for s in skills])
     
-    return f"{headline} {current_title} {summary} {career_text} {skills_text}".lower()
+    raw_doc = f"{headline} {current_title} {summary} {career_text} {skills_text}".lower()
+    return expand_synonyms(raw_doc)
 
-def run_tfidf_search(candidates):
+def run_tfidf_search(candidates: List[Dict]) -> List[Tuple[Dict, float]]:
     """
     Runs TF-IDF vectorization and cosine similarity against the JD.
     Returns the top K candidates with their semantic match scores.
     """
+    logger.info("Building candidate documents for TF-IDF...")
     documents = [build_candidate_document(c) for c in candidates]
     
-    # Use n-grams to capture phrases like "vector database" or "semantic search"
+    logger.info(f"Initializing TF-IDF Vectorizer with max_features={TFIDF_MAX_FEATURES}...")
     vectorizer = TfidfVectorizer(max_features=TFIDF_MAX_FEATURES, stop_words='english', ngram_range=(1, 3))
     
     # Synonym Injection: Create a dense gravity well of terms we care about
@@ -40,7 +63,7 @@ def run_tfidf_search(candidates):
         "elasticsearch opensearch faiss ndcg mrr ranking ltr"
     ) * 3
     
-    enhanced_jd = (JD_TEXT + " " + synonym_magnet).lower()
+    enhanced_jd = expand_synonyms((JD_TEXT + " " + synonym_magnet).lower())
     
     # Fit on candidates + enhanced JD
     all_texts = documents + [enhanced_jd]
@@ -49,7 +72,7 @@ def run_tfidf_search(candidates):
     candidate_vectors = tfidf_matrix[:-1]
     jd_vector = tfidf_matrix[-1]
     
-    # Compute similarities
+    logger.info("Computing cosine similarities between candidates and JD...")
     similarities = cosine_similarity(candidate_vectors, jd_vector).flatten()
     
     # Get top K indices
@@ -61,4 +84,6 @@ def run_tfidf_search(candidates):
         score = similarities[idx]
         top_candidates.append((candidate, float(score)))
         
+    logger.info(f"TF-IDF search complete. Retained top {len(top_candidates)} candidates.")
     return top_candidates
+

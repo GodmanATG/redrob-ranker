@@ -1,6 +1,79 @@
+import logging
+from jinja2 import Template
+from typing import Dict, List
 from config import CORE_SKILLS
 
-def get_conversational_opener(variant, title, company):
+logger = logging.getLogger(__name__)
+
+TEMPLATE_REASONING = """
+{%- if rank <= 25 -%}
+    {{ opener }} 
+    {%- if yoe >= 5.0 and yoe <= 9.0 -%}
+        With exactly {{ yoe }} years of experience, they perfectly hit our senior band requirement.
+    {%- elif yoe < 5.0 -%}
+        While their {{ yoe }} YOE is slightly under our 5-year target, their immense technical depth more than compensates for it.
+    {%- else -%}
+        They bring {{ yoe }} YOE, offering deep senior leadership potential.
+    {%- endif -%}
+    
+    {%- if matched_skills|length >= 2 -%}
+        {%- if variant % 2 == 0 -%}
+            What makes them an elite fit is their advanced, production-level mastery of both {{ matched_skills[0] }} and {{ matched_skills[1] }}.
+        {%- else -%}
+            Their specific expertise in {{ matched_skills[0] }} and {{ matched_skills[1] }} directly aligns with the intelligence layer we are building.
+        {%- endif -%}
+    {%- elif matched_skills -%}
+        Their advanced proficiency in {{ matched_skills[0] }} specifically fulfills our core technical requirements.
+    {%- endif -%}
+    
+    {%- if np_days <= 30 and github > 80 -%}
+        Crucially, they can join in just {{ np_days }} days and have phenomenal behavioral signals (GitHub Activity: {{ github }}, {{ rr_pct }}% recruiter response rate).
+    {%- elif icr > 0.8 -%}
+        Behavioral signals are incredibly strong (response rate: {{ rr_pct }}%, interview completion: {{ icr_pct }}%).
+    {%- else -%}
+        Behavioral signals are solid with a {{ rr_pct }}% recruiter response rate.
+    {%- endif -%}
+{%- elif rank <= 75 -%}
+    {%- if variant % 2 == 0 -%}
+        A very solid contender coming in with {{ yoe }} years of industry experience.
+    {%- else -%}
+        I've ranked this {{ title }} highly because of their strong foundational background.
+    {%- endif -%}
+    
+    {%- if matched_skills -%}
+        They show proven capability in {{ matched_skills[0] }}, which is essential for our vector DB needs.
+    {%- endif -%}
+    
+    {%- if np_days > 60 -%}
+        The only minor drawback is a {{ np_days }}-day notice period, but their technical alignment justifies the wait.
+    {%- elif rr_pct > 70 -%}
+        They are highly engaged, boasting a {{ rr_pct }}% response rate.
+    {%- else -%}
+        They have an acceptable {{ np_days }}-day notice period and reasonable engagement metrics.
+    {%- endif -%}
+{%- else -%}
+    I included this {{ title }} as a borderline but viable candidate.
+    {%- if yoe < 4.5 -%}
+        Their {{ yoe }} YOE is on the lower end, so they might require some ramp-up time.
+    {%- else -%}
+        They have {{ yoe }} YOE, providing a solid baseline.
+    {%- endif -%}
+    
+    {%- if matched_skills -%}
+        They have exposure to {{ matched_skills[0] }}, though they may lack the deepest architectural retrieval experience of our top picks.
+    {%- else -%}
+        While they lack direct advanced vector DB keywords, their overall engineering profile is adjacent enough to warrant a look.
+    {%- endif -%}
+    
+    {%- if rr_pct < 50 -%}
+        Keep in mind their response rate is quite low at {{ rr_pct }}%.
+    {%- else -%}
+        Still, a {{ rr_pct }}% response rate shows they are actively looking.
+    {%- endif -%}
+{%- endif -%}
+"""
+
+def get_conversational_opener(variant: int, title: str, company: str) -> str:
     openers = [
         f"I reviewed this candidate's profile and they are an exceptional fit. They are currently a {title}",
         f"This candidate stands out as a strong potential hire. Bringing their experience as a {title}",
@@ -13,11 +86,12 @@ def get_conversational_opener(variant, title, company):
             f"This {title} from {company} is a standout candidate.",
             f"Their experience at {company} as a {title} caught my attention."
         ]
-    return openers[variant % len(openers)]
+    return openers[abs(variant) % len(openers)]
 
-def generate_reasoning(candidate, rank, score):
+def generate_reasoning(candidate: Dict, rank: int, score: float) -> str:
     """
     Generates a dynamic, fact-based reasoning string that simulates a highly-prompted LLM.
+    Uses a Jinja2 template under the hood to structure paragraphs dynamically.
     """
     profile = candidate.get("profile", {})
     signals = candidate.get("redrob_signals", {})
@@ -26,7 +100,6 @@ def generate_reasoning(candidate, rank, score):
     
     title = profile.get("current_title", "Engineer")
     yoe = profile.get("years_of_experience", 0.0)
-    loc = profile.get("location", "India")
     
     # Extract actual matched core skills
     matched_skills = []
@@ -42,79 +115,34 @@ def generate_reasoning(candidate, rank, score):
     rr_pct = int(rr * 100)
     np_days = signals.get("notice_period_days", 60)
     
-    variant = hash(candidate.get("candidate_id", ""))
+    variant = abs(hash(candidate.get("candidate_id", "")))
     
-    sentences = []
+    opener = get_conversational_opener(variant, title, latest_company)
+    github = signals.get("github_activity_score", 0.0)
+    icr = signals.get("interview_completion_rate", 0.0)
+    icr_pct = int(icr * 100)
     
-    # Tier 1 (Rank 1-25)
-    if rank <= 25:
-        sentences.append(get_conversational_opener(variant, title, latest_company))
-        
-        if 5.0 <= yoe <= 9.0:
-            sentences.append(f"With exactly {yoe} years of experience, they perfectly hit our senior band requirement.")
-        elif yoe < 5.0:
-            sentences.append(f"While their {yoe} YOE is slightly under our 5-year target, their immense technical depth more than compensates for it.")
-        else:
-            sentences.append(f"They bring {yoe} YOE, offering deep senior leadership potential.")
-            
-        if len(matched_skills) >= 2:
-            sk1, sk2 = matched_skills[0], matched_skills[1]
-            if variant % 2 == 0:
-                sentences.append(f"What makes them an elite fit is their advanced, production-level mastery of both {sk1} and {sk2}.")
-            else:
-                sentences.append(f"Their specific expertise in {sk1} and {sk2} directly aligns with the intelligence layer we are building.")
-        elif matched_skills:
-            sentences.append(f"Their advanced proficiency in {matched_skills[0]} specifically fulfills our core technical requirements.")
-            
-        github = signals.get("github_activity_score", 0.0)
-        icr = signals.get("interview_completion_rate", 0.0)
-        icr_pct = int(icr * 100)
-            
-        if np_days <= 30 and github > 80:
-            sentences.append(f"Crucially, they can join in just {np_days} days and have phenomenal behavioral signals (GitHub Activity: {github}, {rr_pct}% recruiter response rate).")
-        elif icr > 0.8:
-            sentences.append(f"Behavioral signals are incredibly strong (response rate: {rr_pct}%, interview completion: {icr_pct}%).")
-        else:
-            sentences.append(f"Behavioral signals are solid with a {rr_pct}% recruiter response rate.")
-
-    # Tier 2 (Rank 26-75)
-    elif rank <= 75:
-        if variant % 2 == 0:
-            sentences.append(f"A very solid contender coming in with {yoe} years of industry experience.")
-        else:
-            sentences.append(f"I've ranked this {title} highly because of their strong foundational background.")
-            
-        if matched_skills:
-            sentences.append(f"They show proven capability in {matched_skills[0]}, which is essential for our vector DB needs.")
-            
-        if np_days > 60:
-            sentences.append(f"The only minor drawback is a {np_days}-day notice period, but their technical alignment justifies the wait.")
-        elif rr_pct > 70:
-            sentences.append(f"They are highly engaged, boasting a {rr_pct}% response rate.")
-        else:
-            sentences.append(f"They have an acceptable {np_days}-day notice period and reasonable engagement metrics.")
-
-    # Tier 3 (Rank 76-100)
-    else:
-        sentences.append(f"I included this {title} as a borderline but viable candidate.")
-        if yoe < 4.5:
-            sentences.append(f"Their {yoe} YOE is on the lower end, so they might require some ramp-up time.")
-        else:
-            sentences.append(f"They have {yoe} YOE, providing a solid baseline.")
-            
-        if matched_skills:
-            sentences.append(f"They have exposure to {matched_skills[0]}, though they may lack the deepest architectural retrieval experience of our top picks.")
-        else:
-            sentences.append("While they lack direct advanced vector DB keywords, their overall engineering profile is adjacent enough to warrant a look.")
-            
-        if rr_pct < 50:
-            sentences.append(f"Keep in mind their response rate is quite low at {rr_pct}%.")
-        else:
-            sentences.append(f"Still, a {rr_pct}% response rate shows they are actively looking.")
-
-    reasoning = " ".join(sentences)
+    # Render Jinja2 template
+    t = Template(TEMPLATE_REASONING)
+    rendered = t.render(
+        rank=rank,
+        opener=opener,
+        yoe=yoe,
+        matched_skills=matched_skills,
+        variant=variant,
+        np_days=np_days,
+        github=github,
+        icr=icr,
+        icr_pct=icr_pct,
+        rr_pct=rr_pct,
+        title=title
+    )
+    
+    # Clean up excess whitespace and format neatly
+    reasoning = " ".join(rendered.split())
     
     if len(reasoning) < 30:
         reasoning = f"Reviewed this {title} with {yoe} YOE. Matches core skills but lacks definitive behavioral signals."
         
     return reasoning
+

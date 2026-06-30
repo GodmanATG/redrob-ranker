@@ -1,6 +1,8 @@
+import datetime
+from typing import List, Dict, Union
 from config import EXP_MIN_TARGET, EXP_MAX_TARGET, CORE_SKILLS
 
-def score_experience(yoe):
+def score_experience(yoe: Union[int, float]) -> float:
     """
     Scores years of experience against target band (5-9 years).
     """
@@ -9,11 +11,11 @@ def score_experience(yoe):
     if EXP_MIN_TARGET <= yoe <= EXP_MAX_TARGET: return 1.0
     
     if yoe < EXP_MIN_TARGET:
-        return max(0, 1.0 - 0.3 * (EXP_MIN_TARGET - yoe))
+        return max(0.0, 1.0 - 0.3 * (EXP_MIN_TARGET - yoe))
     else:
-        return max(0, 1.0 - 0.1 * (yoe - EXP_MAX_TARGET))
+        return max(0.0, 1.0 - 0.1 * (yoe - EXP_MAX_TARGET))
 
-def score_skills(skills):
+def score_skills(skills: List[Dict]) -> float:
     """
     Scores skills based on presence of core JD skills and proficiency/duration.
     """
@@ -36,9 +38,7 @@ def score_skills(skills):
     # Normalize (arbitrary cap at 5 strong core skills = 1.0)
     return min(1.0, score / 5.0)
 
-import datetime
-
-def parse_date(date_str):
+def parse_date(date_str: str) -> datetime.date:
     if not date_str:
         return datetime.date.today() - datetime.timedelta(days=365)
     try:
@@ -46,7 +46,7 @@ def parse_date(date_str):
     except:
         return datetime.date.today() - datetime.timedelta(days=365)
 
-def score_behavioral(signals):
+def score_behavioral(signals: Dict) -> float:
     """
     Scores based on platform engagement, recency, and responsiveness.
     """
@@ -94,7 +94,7 @@ def score_behavioral(signals):
     
     return max(0.0, min(1.0, score))
     
-def score_location(profile, signals):
+def score_location(profile: Dict, signals: Dict) -> float:
     """
     Scores based on JD location preference (Pune/Noida, Tier 1, or willing to relocate).
     """
@@ -109,4 +109,5 @@ def score_location(profile, signals):
         return 0.8
         
     return 0.3
+
 

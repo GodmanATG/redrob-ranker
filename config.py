@@ -34,9 +34,9 @@ Disqualifiers:
 """
 
 # Text matching settings
-TFIDF_MAX_FEATURES = 10000
+TFIDF_MAX_FEATURES = None
 TOP_K_SEMANTIC = 3000
-AI_RERANK_TOP_K = 800
+AI_RERANK_TOP_K = 1200
 
 # Scoring Weights
 WEIGHT_AI = 0.40
@@ -56,3 +56,28 @@ CORE_SKILLS = [
     "qdrant", "milvus", "weaviate", "elasticsearch", "opensearch",
     "python", "ndcg", "mrr", "map", "ranking", "search"
 ]
+
+# Synonym / Acronym expansion mappings for TF-IDF and semantic matching
+SYNONYMS = {
+    "llm": "large language model",
+    "large language model": "llm",
+    "vdb": "vector database",
+    "vector database": "vdb",
+    "vector databases": "vector database vdb",
+    "information retrieval": "ir",
+    "ir": "information retrieval",
+    "learning to rank": "ltr",
+    "ltr": "learning to rank",
+    "natural language processing": "nlp",
+    "nlp": "natural language processing",
+    "machine learning": "ml",
+    "ml": "machine learning",
+    "artificial intelligence": "ai",
+    "ai": "artificial intelligence",
+    "peft": "parameter efficient fine tuning",
+    "lora": "low rank adaptation",
+    "qlora": "quantized low rank adaptation",
+    "elasticsearch": "elastic search",
+    "opensearch": "open search",
+}
+

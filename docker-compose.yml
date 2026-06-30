@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  redrob-ranker:
+    build: .
+    image: redrob-ranker
+    volumes:
+      - .:/app
+      - ./input:/data
+    command: ["--candidates", "/data/candidates.jsonl", "--out", "/app/submission.csv"]

@@ -18,9 +18,9 @@ team_members:
 # Code and reproducibility
 # ============================================================================
 github_repo: "https://github.com/GodmanATG/redrob-ranker.git"
-sandbox_link: "Docker (See Dockerfile in GitHub repo for reproduction)"
+sandbox_link: "Docker Compose (See docker-compose.yml in GitHub repo for reproduction)"
 
-reproduce_command: "docker run -v /path/to/dataset/directory:/data redrob-ranker"
+reproduce_command: "docker-compose up --build"
 
 # ============================================================================
 # Compute environment
